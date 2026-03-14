@@ -74,8 +74,7 @@ function createPinkEmbed(title, description) {
   return new EmbedBuilder()
     .setColor("#ffb6c1")
     .setTitle(title)
-    .setDescription(description)
-    .setTimestamp();
+    .setDescription(description);
 }
 
 function log(guild, title, description) {
@@ -104,8 +103,7 @@ function createWelcomePreviewEmbed(guild) {
         .replaceAll("{user}", "@usuário")
         .replaceAll("{username}", "usuário")
         .replaceAll("{server}", guild.name)
-    )
-    .setTimestamp();
+    );
 
   const image = (config.welcomeImage || "").trim();
 
@@ -122,14 +120,8 @@ function createWelcomePanel() {
     .setTitle("configuração do welcome")
     .setDescription("use os botões abaixo para editar o embed de boas-vindas.")
     .addFields(
-      {
-        name: "título",
-        value: config.welcomeTitle || "não definido"
-      },
-      {
-        name: "descrição",
-        value: config.welcomeDescription || "não definida"
-      },
+      { name: "título", value: config.welcomeTitle || "não definido" },
+      { name: "descrição", value: config.welcomeDescription || "não definida" },
       {
         name: "imagem",
         value:
@@ -137,10 +129,7 @@ function createWelcomePanel() {
             ? config.welcomeImage
             : "vazia"
       },
-      {
-        name: "id do canal",
-        value: config.welcomeChannel || "não definido"
-      }
+      { name: "id do canal", value: config.welcomeChannel || "não definido" }
     )
     .setFooter({
       text: "variáveis disponíveis: {user} | {username} | {server}"
@@ -172,10 +161,7 @@ function createWelcomePanel() {
       .setStyle(ButtonStyle.Primary)
   );
 
-  return {
-    embeds: [embed],
-    components: [row, row2]
-  };
+  return { embeds: [embed], components: [row, row2] };
 }
 
 client.once("clientReady", () => {
@@ -195,7 +181,10 @@ client.on("guildMemberAdd", async (member) => {
       await member.guild.members.fetch();
 
       const recentMembers = member.guild.members.cache.filter(
-        (m) => m.joinedTimestamp && now - m.joinedTimestamp < 10000 && !m.user.bot
+        (m) =>
+          m.joinedTimestamp &&
+          now - m.joinedTimestamp < 10000 &&
+          !m.user.bot
       );
 
       for (const [, raidMember] of recentMembers) {
@@ -225,8 +214,7 @@ client.on("guildMemberAdd", async (member) => {
   const embed = new EmbedBuilder()
     .setColor("#ffb6c1")
     .setTitle(title)
-    .setDescription(desc)
-    .setTimestamp();
+    .setDescription(desc);
 
   const welcomeImage = (config.welcomeImage || "").trim();
 
@@ -235,368 +223,8 @@ client.on("guildMemberAdd", async (member) => {
   }
 
   await welcomeChannel.send({
-    content: `${member}`,
     embeds: [embed]
   }).catch(() => {});
-});
-
-client.on("guildBanAdd", async (ban) => {
-  try {
-    log(
-      ban.guild,
-      "ban detectado",
-      `usuário banido: <@${ban.user.id}>`
-    );
-  } catch (error) {
-    console.error("erro no log de ban:", error);
-  }
-});
-
-client.on("messageCreate", async (message) => {
-  if (!message.guild) return;
-  if (message.author.bot) return;
-
-  const inviteRegex =
-    /(https?:\/\/)?(www\.)?(discord\.gg|discord\.com\/invite|discordapp\.com\/invite)\/[a-zA-Z0-9-]+/gi;
-
-  if (inviteRegex.test(message.content)) {
-    if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
-      await message.delete().catch(() => {});
-
-      await message.guild.members.ban(message.author.id, {
-        reason: "divulgação de servidor"
-      }).catch(() => {});
-
-      log(
-        message.guild,
-        "usuário banido",
-        `usuário: <@${message.author.id}>
-motivo: divulgação
-mensagem: ${message.content}`
-      );
-
-      return;
-    }
-  }
-
-  if (!message.content.startsWith(config.prefix)) return;
-
-  const args = message.content.slice(config.prefix.length).trim().split(/\s+/);
-  const command = args.shift()?.toLowerCase();
-
-  if (command === "help") {
-    const embed = new EmbedBuilder()
-      .setColor("#ffb6c1")
-      .setTitle("painel de ajuda")
-      .setDescription("comandos disponíveis")
-      .addFields(
-        { name: `${config.prefix}ban @usuário motivo`, value: "bane um usuário" },
-        { name: `${config.prefix}unban id`, value: "remove o ban de um usuário pelo id" },
-        { name: `${config.prefix}kick @usuário motivo`, value: "expulsa um usuário" },
-        { name: `${config.prefix}nuke`, value: "clona e limpa o canal atual" },
-        { name: `${config.prefix}welcome`, value: "abre o painel de configuração do welcome" }
-      )
-      .setTimestamp();
-
-    return message.reply({ embeds: [embed] });
-  }
-
-  if (command === "welcome") {
-    if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
-      return message.reply("você não tem permissão para isso.");
-    }
-
-    return message.reply(createWelcomePanel());
-  }
-
-  if (command === "ban") {
-    if (!message.member.permissions.has(PermissionsBitField.Flags.BanMembers)) {
-      return message.reply("você não tem permissão para banir.");
-    }
-
-    if (!message.guild.members.me.permissions.has(PermissionsBitField.Flags.BanMembers)) {
-      return message.reply("eu não tenho permissão para banir.");
-    }
-
-    const target = message.mentions.members.first();
-    if (!target) {
-      return message.reply("mencione um usuário.");
-    }
-
-    if (target.id === message.author.id) {
-      return message.reply("você não pode banir a si mesmo.");
-    }
-
-    if (!target.bannable) {
-      return message.reply("não consigo banir esse usuário.");
-    }
-
-    const reason = args.join(" ") || "sem motivo informado";
-
-    await target.ban({ reason }).catch(() => {});
-    await message.reply(`usuário banido: ${target.user.tag}`);
-
-    log(
-      message.guild,
-      "ban manual",
-      `moderador: <@${message.author.id}>
-usuário: <@${target.id}>
-motivo: ${reason}`
-    );
-
-    return;
-  }
-
-  if (command === "unban") {
-    if (!message.member.permissions.has(PermissionsBitField.Flags.BanMembers)) {
-      return message.reply("você não tem permissão para desbanir.");
-    }
-
-    if (!message.guild.members.me.permissions.has(PermissionsBitField.Flags.BanMembers)) {
-      return message.reply("eu não tenho permissão para desbanir.");
-    }
-
-    const userId = args[0];
-    if (!userId) {
-      return message.reply("informe o id do usuário.");
-    }
-
-    try {
-      const bans = await message.guild.bans.fetch();
-      const bannedUser = bans.get(userId);
-
-      if (!bannedUser) {
-        return message.reply("esse usuário não está banido.");
-      }
-
-      await message.guild.members.unban(userId);
-      await message.reply(`usuário desbanido: ${bannedUser.user.tag}`);
-
-      log(
-        message.guild,
-        "unban executado",
-        `moderador: <@${message.author.id}>
-usuário: <@${bannedUser.user.id}>`
-      );
-    } catch (error) {
-      console.error("erro ao desbanir:", error);
-      return message.reply("não consegui desbanir esse usuário.");
-    }
-
-    return;
-  }
-
-  if (command === "kick") {
-    if (!message.member.permissions.has(PermissionsBitField.Flags.KickMembers)) {
-      return message.reply("você não tem permissão para expulsar.");
-    }
-
-    if (!message.guild.members.me.permissions.has(PermissionsBitField.Flags.KickMembers)) {
-      return message.reply("eu não tenho permissão para expulsar.");
-    }
-
-    const target = message.mentions.members.first();
-    if (!target) {
-      return message.reply("mencione um usuário.");
-    }
-
-    if (target.id === message.author.id) {
-      return message.reply("você não pode expulsar a si mesmo.");
-    }
-
-    if (!target.kickable) {
-      return message.reply("não consigo expulsar esse usuário.");
-    }
-
-    const reason = args.join(" ") || "sem motivo informado";
-
-    await target.kick(reason).catch(() => {});
-    await message.reply(`usuário expulso: ${target.user.tag}`);
-
-    log(
-      message.guild,
-      "kick executado",
-      `moderador: <@${message.author.id}>
-usuário: <@${target.id}>
-motivo: ${reason}`
-    );
-
-    return;
-  }
-
-  if (command === "nuke") {
-    if (!message.member.permissions.has(PermissionsBitField.Flags.ManageChannels)) {
-      return message.reply("você não tem permissão para isso.");
-    }
-
-    if (!message.guild.members.me.permissions.has(PermissionsBitField.Flags.ManageChannels)) {
-      return message.reply("eu não tenho permissão para gerenciar canais.");
-    }
-
-    const oldChannel = message.channel;
-    const newChannel = await oldChannel.clone().catch(() => null);
-
-    if (!newChannel) {
-      return message.reply("não consegui clonar o canal.");
-    }
-
-    await newChannel.setPosition(oldChannel.position).catch(() => {});
-    await oldChannel.delete().catch(() => {});
-    await newChannel.send("canal resetado.").catch(() => {});
-
-    log(
-      message.guild,
-      "nuke executado",
-      `canal: ${oldChannel.name}
-responsável: <@${message.author.id}>`
-    );
-
-    return;
-  }
-});
-
-client.on("interactionCreate", async (interaction) => {
-  if (interaction.isButton()) {
-    if (!interaction.guild) return;
-
-    if (!interaction.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
-      return interaction.reply({
-        content: "você não tem permissão para isso.",
-        ephemeral: true
-      });
-    }
-
-    if (interaction.customId === "welcome_preview") {
-      return interaction.reply({
-        embeds: [createWelcomePreviewEmbed(interaction.guild)],
-        ephemeral: true
-      });
-    }
-
-    const modal = new ModalBuilder()
-      .setCustomId(interaction.customId)
-      .setTitle("configurar welcome");
-
-    if (interaction.customId === "welcome_title") {
-      const input = new TextInputBuilder()
-        .setCustomId("value")
-        .setLabel("título")
-        .setStyle(TextInputStyle.Short)
-        .setRequired(true)
-        .setValue(config.welcomeTitle || "novo membro");
-
-      modal.addComponents(new ActionRowBuilder().addComponents(input));
-      return interaction.showModal(modal);
-    }
-
-    if (interaction.customId === "welcome_description") {
-      const input = new TextInputBuilder()
-        .setCustomId("value")
-        .setLabel("descrição")
-        .setStyle(TextInputStyle.Paragraph)
-        .setRequired(true)
-        .setValue(config.welcomeDescription || "{user} entrou em {server}");
-
-      modal.addComponents(new ActionRowBuilder().addComponents(input));
-      return interaction.showModal(modal);
-    }
-
-    if (interaction.customId === "welcome_image") {
-      const input = new TextInputBuilder()
-        .setCustomId("value")
-        .setLabel("imagem opcional")
-        .setStyle(TextInputStyle.Short)
-        .setRequired(false)
-        .setValue(config.welcomeImage || "");
-
-      modal.addComponents(new ActionRowBuilder().addComponents(input));
-      return interaction.showModal(modal);
-    }
-
-    if (interaction.customId === "welcome_channel") {
-      const input = new TextInputBuilder()
-        .setCustomId("value")
-        .setLabel("id do canal de boas-vindas")
-        .setStyle(TextInputStyle.Short)
-        .setRequired(true)
-        .setValue(config.welcomeChannel || "");
-
-      modal.addComponents(new ActionRowBuilder().addComponents(input));
-      return interaction.showModal(modal);
-    }
-  }
-
-  if (interaction.isModalSubmit()) {
-    if (!interaction.guild) return;
-
-    if (!interaction.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
-      return interaction.reply({
-        content: "você não tem permissão para isso.",
-        ephemeral: true
-      });
-    }
-
-    const value = interaction.fields.getTextInputValue("value");
-
-    if (interaction.customId === "welcome_title") {
-      config.welcomeTitle = value;
-      saveConfig();
-
-      return interaction.reply({
-        content: "título atualizado.",
-        ephemeral: true
-      });
-    }
-
-    if (interaction.customId === "welcome_description") {
-      config.welcomeDescription = value;
-      saveConfig();
-
-      return interaction.reply({
-        content: "descrição atualizada.",
-        ephemeral: true
-      });
-    }
-
-    if (interaction.customId === "welcome_image") {
-      const imageValue = value.trim();
-
-      if (imageValue !== "" && !isValidUrl(imageValue)) {
-        return interaction.reply({
-          content:
-            "coloque uma url válida começando com http:// ou https://, ou deixe vazio para remover.",
-          ephemeral: true
-        });
-      }
-
-      config.welcomeImage = imageValue;
-      saveConfig();
-
-      return interaction.reply({
-        content: imageValue ? "imagem atualizada." : "imagem removida.",
-        ephemeral: true
-      });
-    }
-
-    if (interaction.customId === "welcome_channel") {
-      const channel = interaction.guild.channels.cache.get(value.trim());
-
-      if (!channel || !channel.isTextBased()) {
-        return interaction.reply({
-          content: "esse id de canal não existe neste servidor.",
-          ephemeral: true
-        });
-      }
-
-      config.welcomeChannel = value.trim();
-      saveConfig();
-
-      return interaction.reply({
-        content: "canal de boas-vindas atualizado.",
-        ephemeral: true
-      });
-    }
-  }
 });
 
 client.login(TOKEN);
