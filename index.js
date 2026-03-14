@@ -18,8 +18,14 @@ const configPath = path.join(__dirname, "config.json");
 const defaultConfig = {
   prefix: "!",
   logChannel: "",
-  welcomeTitle: "novo membro",
-  welcomeDescription: "{user} entrou em {server}",
+  welcomeTitle: "ㅤ⼃ 𖽓 ׅ welcome⠀. ♡⃪⠀꒰ᐢ. ̯ .ᐢ꒱",
+  welcomeDescription: "ㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤ ㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤ ㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤ
+ㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤ    ㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤ    ㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤ
+ㅤㅤ˚　 <a:014White_Sparkles:1482140688731865241>　　 ⿻   　﹕  　˳     {user}　 ﹒    ⊹
+　　⠀ ﹒　seja  bem-vindo  à  Roleplay ⠀ ❛⠀⠀<:bunnyzani:1482141259522113628>
+　　　˳⠀⠀⯎　leia nossas regras do servidor​⠀❜ ₊
+　　ㅤㅤ⠀︶︶    .    ︶︶     .    ︶︶     .   ︶︶     .    ︶
+ㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤ    ㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤ    ㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤ",
   welcomeImage: "",
   welcomeChannel: ""
 };
