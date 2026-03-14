@@ -7,13 +7,47 @@ const {
   ButtonStyle,
   ModalBuilder,
   TextInputBuilder,
-  TextInputStyle
+  TextInputStyle,
+  PermissionsBitField
 } = require("discord.js");
 const fs = require("fs");
 const path = require("path");
 
 const configPath = path.join(__dirname, "config.json");
-let config = require("./config.json");
+
+const defaultConfig = {
+  prefix: "!",
+  logChannel: "",
+  welcomeTitle: "novo membro",
+  welcomeDescription: "{user} entrou em {server}",
+  welcomeImage: "",
+  welcomeChannel: ""
+};
+
+function ensureConfigFile() {
+  if (!fs.existsSync(configPath)) {
+    fs.writeFileSync(
+      configPath,
+      JSON.stringify(defaultConfig, null, 2),
+      "utf8"
+    );
+  }
+}
+
+function loadConfig() {
+  ensureConfigFile();
+  const raw = fs.readFileSync(configPath, "utf8");
+  return { ...defaultConfig, ...JSON.parse(raw) };
+}
+
+let config = loadConfig();
+
+const TOKEN = process.env.TOKEN;
+
+if (!TOKEN) {
+  console.error("TOKEN não definida no ambiente.");
+  process.exit(1);
+}
 
 const client = new Client({
   intents: [
@@ -28,8 +62,7 @@ const client = new Client({
 const joinTimestamps = new Map();
 
 function reloadConfig() {
-  delete require.cache[require.resolve("./config.json")];
-  config = require("./config.json");
+  config = loadConfig();
 }
 
 function saveConfig() {
@@ -47,7 +80,7 @@ function createPinkEmbed(title, description) {
 
 function log(guild, title, description) {
   const channel = guild.channels.cache.get(config.logChannel);
-  if (!channel) return;
+  if (!channel || !channel.isTextBased()) return;
 
   const embed = createPinkEmbed(title, description);
   channel.send({ embeds: [embed] }).catch(() => {});
@@ -83,7 +116,7 @@ function createWelcomePreviewEmbed(guild) {
   return embed;
 }
 
-function createWelcomePanel(guild) {
+function createWelcomePanel() {
   const embed = new EmbedBuilder()
     .setColor("#ffb6c1")
     .setTitle("configuração do welcome")
@@ -107,6 +140,14 @@ function createWelcomePanel(guild) {
       {
         name: "id do canal",
         value: config.welcomeChannel || "não definido"
+      },
+      {
+        name: "id do canal de logs",
+        value: config.logChannel || "não definido"
+      },
+      {
+        name: "prefixo",
+        value: config.prefix || "!"
       }
     )
     .setFooter({
@@ -128,7 +169,7 @@ function createWelcomePanel(guild) {
       .setStyle(ButtonStyle.Secondary),
     new ButtonBuilder()
       .setCustomId("welcome_channel")
-      .setLabel("id")
+      .setLabel("id canal")
       .setStyle(ButtonStyle.Secondary)
   );
 
@@ -136,7 +177,15 @@ function createWelcomePanel(guild) {
     new ButtonBuilder()
       .setCustomId("welcome_preview")
       .setLabel("prévia")
-      .setStyle(ButtonStyle.Primary)
+      .setStyle(ButtonStyle.Primary),
+    new ButtonBuilder()
+      .setCustomId("log_channel")
+      .setLabel("id logs")
+      .setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder()
+      .setCustomId("bot_prefix")
+      .setLabel("prefixo")
+      .setStyle(ButtonStyle.Secondary)
   );
 
   return {
@@ -180,7 +229,7 @@ client.on("guildMemberAdd", async (member) => {
   }
 
   const welcomeChannel = member.guild.channels.cache.get(config.welcomeChannel);
-  if (!welcomeChannel) return;
+  if (!welcomeChannel || !welcomeChannel.isTextBased()) return;
 
   const title = config.welcomeTitle || "novo membro";
 
@@ -223,10 +272,11 @@ client.on("messageCreate", async (message) => {
   if (!message.guild) return;
   if (message.author.bot) return;
 
-  const inviteRegex = /(https?:\/\/)?(www\.)?(discord\.gg|discord\.com\/invite|discordapp\.com\/invite)\/[a-zA-Z0-9-]+/gi;
+  const inviteRegex =
+    /(https?:\/\/)?(www\.)?(discord\.gg|discord\.com\/invite|discordapp\.com\/invite)\/[a-zA-Z0-9-]+/gi;
 
   if (inviteRegex.test(message.content)) {
-    if (!message.member.permissions.has("Administrator")) {
+    if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
       await message.delete().catch(() => {});
 
       await message.guild.members.ban(message.author.id, {
@@ -256,11 +306,11 @@ mensagem: ${message.content}`
       .setTitle("painel de ajuda")
       .setDescription("comandos disponíveis")
       .addFields(
-        { name: "!ban @usuário motivo", value: "bane um usuário" },
-        { name: "!unban id", value: "remove o ban de um usuário pelo id" },
-        { name: "!kick @usuário motivo", value: "expulsa um usuário" },
-        { name: "!nuke", value: "clona e limpa o canal atual" },
-        { name: "!welcome", value: "abre o painel de configuração do welcome" }
+        { name: `${config.prefix}ban @usuário motivo`, value: "bane um usuário" },
+        { name: `${config.prefix}unban id`, value: "remove o ban de um usuário pelo id" },
+        { name: `${config.prefix}kick @usuário motivo`, value: "expulsa um usuário" },
+        { name: `${config.prefix}nuke`, value: "clona e limpa o canal atual" },
+        { name: `${config.prefix}welcome`, value: "abre o painel de configuração do welcome" }
       )
       .setTimestamp();
 
@@ -268,19 +318,19 @@ mensagem: ${message.content}`
   }
 
   if (command === "welcome") {
-    if (!message.member.permissions.has("Administrator")) {
+    if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
       return message.reply("você não tem permissão para isso.");
     }
 
-    return message.reply(createWelcomePanel(message.guild));
+    return message.reply(createWelcomePanel());
   }
 
   if (command === "ban") {
-    if (!message.member.permissions.has("BanMembers")) {
+    if (!message.member.permissions.has(PermissionsBitField.Flags.BanMembers)) {
       return message.reply("você não tem permissão para banir.");
     }
 
-    if (!message.guild.members.me.permissions.has("BanMembers")) {
+    if (!message.guild.members.me.permissions.has(PermissionsBitField.Flags.BanMembers)) {
       return message.reply("eu não tenho permissão para banir.");
     }
 
@@ -314,11 +364,11 @@ motivo: ${reason}`
   }
 
   if (command === "unban") {
-    if (!message.member.permissions.has("BanMembers")) {
+    if (!message.member.permissions.has(PermissionsBitField.Flags.BanMembers)) {
       return message.reply("você não tem permissão para desbanir.");
     }
 
-    if (!message.guild.members.me.permissions.has("BanMembers")) {
+    if (!message.guild.members.me.permissions.has(PermissionsBitField.Flags.BanMembers)) {
       return message.reply("eu não tenho permissão para desbanir.");
     }
 
@@ -336,7 +386,6 @@ motivo: ${reason}`
       }
 
       await message.guild.members.unban(userId);
-
       await message.reply(`usuário desbanido: ${bannedUser.user.tag}`);
 
       log(
@@ -354,11 +403,11 @@ usuário: <@${bannedUser.user.id}>`
   }
 
   if (command === "kick") {
-    if (!message.member.permissions.has("KickMembers")) {
+    if (!message.member.permissions.has(PermissionsBitField.Flags.KickMembers)) {
       return message.reply("você não tem permissão para expulsar.");
     }
 
-    if (!message.guild.members.me.permissions.has("KickMembers")) {
+    if (!message.guild.members.me.permissions.has(PermissionsBitField.Flags.KickMembers)) {
       return message.reply("eu não tenho permissão para expulsar.");
     }
 
@@ -392,11 +441,11 @@ motivo: ${reason}`
   }
 
   if (command === "nuke") {
-    if (!message.member.permissions.has("ManageChannels")) {
+    if (!message.member.permissions.has(PermissionsBitField.Flags.ManageChannels)) {
       return message.reply("você não tem permissão para isso.");
     }
 
-    if (!message.guild.members.me.permissions.has("ManageChannels")) {
+    if (!message.guild.members.me.permissions.has(PermissionsBitField.Flags.ManageChannels)) {
       return message.reply("eu não tenho permissão para gerenciar canais.");
     }
 
@@ -426,7 +475,7 @@ client.on("interactionCreate", async (interaction) => {
   if (interaction.isButton()) {
     if (!interaction.guild) return;
 
-    if (!interaction.member.permissions.has("Administrator")) {
+    if (!interaction.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
       return interaction.reply({
         content: "você não tem permissão para isso.",
         ephemeral: true
@@ -452,10 +501,7 @@ client.on("interactionCreate", async (interaction) => {
         .setRequired(true)
         .setValue(config.welcomeTitle || "novo membro");
 
-      modal.addComponents(
-        new ActionRowBuilder().addComponents(input)
-      );
-
+      modal.addComponents(new ActionRowBuilder().addComponents(input));
       return interaction.showModal(modal);
     }
 
@@ -467,10 +513,7 @@ client.on("interactionCreate", async (interaction) => {
         .setRequired(true)
         .setValue(config.welcomeDescription || "{user} entrou em {server}");
 
-      modal.addComponents(
-        new ActionRowBuilder().addComponents(input)
-      );
-
+      modal.addComponents(new ActionRowBuilder().addComponents(input));
       return interaction.showModal(modal);
     }
 
@@ -482,10 +525,7 @@ client.on("interactionCreate", async (interaction) => {
         .setRequired(false)
         .setValue(config.welcomeImage || "");
 
-      modal.addComponents(
-        new ActionRowBuilder().addComponents(input)
-      );
-
+      modal.addComponents(new ActionRowBuilder().addComponents(input));
       return interaction.showModal(modal);
     }
 
@@ -497,10 +537,31 @@ client.on("interactionCreate", async (interaction) => {
         .setRequired(true)
         .setValue(config.welcomeChannel || "");
 
-      modal.addComponents(
-        new ActionRowBuilder().addComponents(input)
-      );
+      modal.addComponents(new ActionRowBuilder().addComponents(input));
+      return interaction.showModal(modal);
+    }
 
+    if (interaction.customId === "log_channel") {
+      const input = new TextInputBuilder()
+        .setCustomId("value")
+        .setLabel("id do canal de logs")
+        .setStyle(TextInputStyle.Short)
+        .setRequired(false)
+        .setValue(config.logChannel || "");
+
+      modal.addComponents(new ActionRowBuilder().addComponents(input));
+      return interaction.showModal(modal);
+    }
+
+    if (interaction.customId === "bot_prefix") {
+      const input = new TextInputBuilder()
+        .setCustomId("value")
+        .setLabel("prefixo do bot")
+        .setStyle(TextInputStyle.Short)
+        .setRequired(true)
+        .setValue(config.prefix || "!");
+
+      modal.addComponents(new ActionRowBuilder().addComponents(input));
       return interaction.showModal(modal);
     }
   }
@@ -508,7 +569,7 @@ client.on("interactionCreate", async (interaction) => {
   if (interaction.isModalSubmit()) {
     if (!interaction.guild) return;
 
-    if (!interaction.member.permissions.has("Administrator")) {
+    if (!interaction.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
       return interaction.reply({
         content: "você não tem permissão para isso.",
         ephemeral: true
@@ -542,7 +603,8 @@ client.on("interactionCreate", async (interaction) => {
 
       if (imageValue !== "" && !isValidUrl(imageValue)) {
         return interaction.reply({
-          content: "coloque uma url válida começando com http:// ou https://, ou deixe vazio para remover.",
+          content:
+            "coloque uma url válida começando com http:// ou https://, ou deixe vazio para remover.",
           ephemeral: true
         });
       }
@@ -559,7 +621,7 @@ client.on("interactionCreate", async (interaction) => {
     if (interaction.customId === "welcome_channel") {
       const channel = interaction.guild.channels.cache.get(value.trim());
 
-      if (!channel) {
+      if (!channel || !channel.isTextBased()) {
         return interaction.reply({
           content: "esse id de canal não existe neste servidor.",
           ephemeral: true
@@ -574,7 +636,49 @@ client.on("interactionCreate", async (interaction) => {
         ephemeral: true
       });
     }
+
+    if (interaction.customId === "log_channel") {
+      const trimmed = value.trim();
+
+      if (trimmed !== "") {
+        const channel = interaction.guild.channels.cache.get(trimmed);
+
+        if (!channel || !channel.isTextBased()) {
+          return interaction.reply({
+            content: "esse id de canal de logs não existe neste servidor.",
+            ephemeral: true
+          });
+        }
+      }
+
+      config.logChannel = trimmed;
+      saveConfig();
+
+      return interaction.reply({
+        content: trimmed ? "canal de logs atualizado." : "canal de logs removido.",
+        ephemeral: true
+      });
+    }
+
+    if (interaction.customId === "bot_prefix") {
+      const trimmed = value.trim();
+
+      if (!trimmed) {
+        return interaction.reply({
+          content: "o prefixo não pode ficar vazio.",
+          ephemeral: true
+        });
+      }
+
+      config.prefix = trimmed;
+      saveConfig();
+
+      return interaction.reply({
+        content: `prefixo atualizado para \`${trimmed}\`.`,
+        ephemeral: true
+      });
+    }
   }
 });
 
-client.login(config.token);
+client.login(TOKEN);
