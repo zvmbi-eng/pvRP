@@ -140,14 +140,6 @@ function createWelcomePanel() {
       {
         name: "id do canal",
         value: config.welcomeChannel || "não definido"
-      },
-      {
-        name: "id do canal de logs",
-        value: config.logChannel || "não definido"
-      },
-      {
-        name: "prefixo",
-        value: config.prefix || "!"
       }
     )
     .setFooter({
@@ -177,15 +169,7 @@ function createWelcomePanel() {
     new ButtonBuilder()
       .setCustomId("welcome_preview")
       .setLabel("prévia")
-      .setStyle(ButtonStyle.Primary),
-    new ButtonBuilder()
-      .setCustomId("log_channel")
-      .setLabel("id logs")
-      .setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder()
-      .setCustomId("bot_prefix")
-      .setLabel("prefixo")
-      .setStyle(ButtonStyle.Secondary)
+      .setStyle(ButtonStyle.Primary)
   );
 
   return {
@@ -194,7 +178,7 @@ function createWelcomePanel() {
   };
 }
 
-client.once("ready", () => {
+client.once("clientReady", () => {
   console.log(`${client.user.tag} online`);
 });
 
@@ -347,7 +331,7 @@ mensagem: ${message.content}`
       return message.reply("não consigo banir esse usuário.");
     }
 
-    const reason = args.slice(1).join(" ") || "sem motivo informado";
+    const reason = args.join(" ") || "sem motivo informado";
 
     await target.ban({ reason }).catch(() => {});
     await message.reply(`usuário banido: ${target.user.tag}`);
@@ -424,7 +408,7 @@ usuário: <@${bannedUser.user.id}>`
       return message.reply("não consigo expulsar esse usuário.");
     }
 
-    const reason = args.slice(1).join(" ") || "sem motivo informado";
+    const reason = args.join(" ") || "sem motivo informado";
 
     await target.kick(reason).catch(() => {});
     await message.reply(`usuário expulso: ${target.user.tag}`);
@@ -540,30 +524,6 @@ client.on("interactionCreate", async (interaction) => {
       modal.addComponents(new ActionRowBuilder().addComponents(input));
       return interaction.showModal(modal);
     }
-
-    if (interaction.customId === "log_channel") {
-      const input = new TextInputBuilder()
-        .setCustomId("value")
-        .setLabel("id do canal de logs")
-        .setStyle(TextInputStyle.Short)
-        .setRequired(false)
-        .setValue(config.logChannel || "");
-
-      modal.addComponents(new ActionRowBuilder().addComponents(input));
-      return interaction.showModal(modal);
-    }
-
-    if (interaction.customId === "bot_prefix") {
-      const input = new TextInputBuilder()
-        .setCustomId("value")
-        .setLabel("prefixo do bot")
-        .setStyle(TextInputStyle.Short)
-        .setRequired(true)
-        .setValue(config.prefix || "!");
-
-      modal.addComponents(new ActionRowBuilder().addComponents(input));
-      return interaction.showModal(modal);
-    }
   }
 
   if (interaction.isModalSubmit()) {
@@ -633,48 +593,6 @@ client.on("interactionCreate", async (interaction) => {
 
       return interaction.reply({
         content: "canal de boas-vindas atualizado.",
-        ephemeral: true
-      });
-    }
-
-    if (interaction.customId === "log_channel") {
-      const trimmed = value.trim();
-
-      if (trimmed !== "") {
-        const channel = interaction.guild.channels.cache.get(trimmed);
-
-        if (!channel || !channel.isTextBased()) {
-          return interaction.reply({
-            content: "esse id de canal de logs não existe neste servidor.",
-            ephemeral: true
-          });
-        }
-      }
-
-      config.logChannel = trimmed;
-      saveConfig();
-
-      return interaction.reply({
-        content: trimmed ? "canal de logs atualizado." : "canal de logs removido.",
-        ephemeral: true
-      });
-    }
-
-    if (interaction.customId === "bot_prefix") {
-      const trimmed = value.trim();
-
-      if (!trimmed) {
-        return interaction.reply({
-          content: "o prefixo não pode ficar vazio.",
-          ephemeral: true
-        });
-      }
-
-      config.prefix = trimmed;
-      saveConfig();
-
-      return interaction.reply({
-        content: `prefixo atualizado para \`${trimmed}\`.`,
         ephemeral: true
       });
     }
